@@ -271,7 +271,7 @@ app.post('/api/push/unsubscribe', auth, async (req, res) => {
 });
 
 // Local development serves the page itself; on Vercel the CDN serves public/ and this line is ignored.
-app.use(express.static(path.join(here, 'public'), { maxAge: prod ? '1h' : 0 }));
+app.use(express.static(path.join(here, 'public'), { maxAge: 0 }));
 
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   console.error(err.message);
