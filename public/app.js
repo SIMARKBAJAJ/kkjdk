@@ -272,12 +272,38 @@ async function setupPush() {
 }
 
 // ---------- start ----------
+// A reusable door link: ask for a name once, then this device stays signed in.
+async function enterWithKey(key) {
+  const form = $('#enter'), input = $('#name');
+  let seats;
+  try { seats = await api('/enter', { key }); } catch (e) { history.replaceState(null, '', '/'); return showJoin(e.message); }
+  setState('join', 'The Door', seats.full ? 'Tap your name.' : 'Who are you? Type your name.');
+  $('#names').replaceChildren(...seats.names.map((n) => Object.assign(document.createElement('button'), { type: 'button', className: 'soft', textContent: n, onclick: () => submit(n) })));
+  input.hidden = seats.full;
+  form.querySelector('button[type=submit]').hidden = seats.full;
+  form.hidden = false;
+  async function submit(name) {
+    try { await api('/enter', { key, name }); } catch (e) { return flash(e.message); }
+    history.replaceState(null, '', '/');
+    form.hidden = true;
+    start();
+  }
+  form.onsubmit = (ev) => { ev.preventDefault(); if (input.value.trim()) submit(input.value.trim()); };
+}
+
 async function init() {
-  const code = new URLSearchParams(location.search).get('invite');
+  const params = new URLSearchParams(location.search);
+  const doorKey = params.get('door');
+  if (doorKey) return enterWithKey(doorKey);
+  const code = params.get('invite');
   if (code) {
     try { await api('/join', { code }); } catch (e) { history.replaceState(null, '', '/'); return showJoin(e.message); }
     history.replaceState(null, '', '/');
   }
+  start();
+}
+
+async function start() {
   await refresh();
   if (stage.dataset.state === 'join') return;
   poll = setInterval(() => { if (!document.hidden) refresh(); }, 5000); // idle tabs stay quiet; push covers them

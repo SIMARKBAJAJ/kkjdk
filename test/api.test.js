@@ -190,3 +190,16 @@ test('knock spam is rate limited', async () => {
   for (let i = 0; i < 8; i++) codes.push((await A('/api/knock', {})).status);
   assert.ok(codes.includes(429), `expected a 429 in ${codes}`);
 });
+
+test('a reusable door link: wrong key refused, two people claim seats, a third is refused', async () => {
+  const key = (await import('node:crypto')).createHmac('sha256', 'x'.repeat(40)).update('door-link').digest('hex').slice(0, 32);
+  const x = device();
+  assert.equal((await x('/api/enter', { key: 'nope' })).status, 400);
+  const seats = await x('/api/enter', { key });
+  assert.equal(seats.status, 200);
+  assert.equal(seats.json.full, true, 'the seeded door already has two people');
+  assert.equal((await x('/api/enter', { key, name: 'Stranger' })).status, 400);
+  const back = await x('/api/enter', { key, name: 'simar' });
+  assert.equal(back.status, 200);
+  assert.equal((await x('/api/status')).json.me.name, 'Simar');
+});

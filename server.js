@@ -4,6 +4,7 @@ import { AccessToken } from 'livekit-server-sdk';
 import webpush from 'web-push';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { db, ensureSchema, one, all, run, sha, rand } from './db.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -155,6 +156,32 @@ async function auth(req, res, next) {
   req.user = user;
   next();
 }
+
+// One reusable door link (?door=KEY) for a private pair: whoever has it picks a name on first visit.
+// KEY is DOOR_KEY if set, otherwise derived from LIVEKIT_API_SECRET so no extra setting is needed.
+const doorKey = () => process.env.DOOR_KEY || (process.env.LIVEKIT_API_SECRET
+  ? crypto.createHmac('sha256', process.env.LIVEKIT_API_SECRET).update('door-link').digest('hex').slice(0, 32) : '');
+app.post('/api/enter', rate('enter', 10, 60_000, (req) => req.ip), async (req, res) => {
+  const key = String(req.body?.key || ''), want = doorKey();
+  if (!want || key.length !== want.length || !crypto.timingSafeEqual(Buffer.from(key), Buffer.from(want))) {
+    return res.status(400).json({ error: 'This link is not valid.' });
+  }
+  let [door] = await all('SELECT id FROM doors ORDER BY created LIMIT 1');
+  if (!door) { door = { id: rand(16) }; await run('INSERT INTO doors(id, created) VALUES (?, ?)', door.id, now()); }
+  const users = await all('SELECT id, name FROM users WHERE door_id = ? ORDER BY created', door.id);
+  const name = String(req.body?.name || '').trim().slice(0, 30);
+  if (!name) return res.json({ names: users.map((u) => u.name), full: users.length >= 2 });
+  let user = users.find((u) => u.name.toLowerCase() === name.toLowerCase());
+  if (!user) {
+    if (users.length >= 2) return res.status(400).json({ error: 'This door already has two people. Pick one of the names.' });
+    user = { id: crypto.randomUUID() };
+    await run('INSERT INTO users(id, door_id, name, created) VALUES (?, ?, ?, ?)', user.id, door.id, name, now());
+  }
+  const token = rand(32);
+  await run('INSERT INTO sessions(token_hash, user_id, created, expires) VALUES (?, ?, ?, ?)', sha(token), user.id, now(), now() + SESSION_MS);
+  res.cookie('door_session', token, { httpOnly: true, sameSite: 'lax', secure: prod, maxAge: SESSION_MS, path: '/' });
+  res.json({ ok: true });
+});
 
 app.post('/api/join', rate('join', 10, 60_000, (req) => req.ip), async (req, res) => {
   const h = sha(String(req.body?.code || ''));

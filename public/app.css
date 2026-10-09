@@ -154,3 +154,8 @@ h1 { margin: 6px 0 0; font: 600 clamp(26px, 6vw, 34px) / 1.1 var(--serif); lette
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: .01s !important; }
 }
+
+#enter { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+#enter[hidden] { display: none; }
+#names { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+#enter input { font: inherit; padding: 10px 14px; border-radius: 12px; border: 1px solid #ffffff33; background: #ffffff14; color: inherit; text-align: center; }
