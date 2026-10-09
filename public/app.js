@@ -41,6 +41,7 @@ function showJoin(message) {
 function friendly(e) {
   if (e?.name === 'NotAllowedError' || /permission|denied/i.test(e?.message || '')) return 'Camera or microphone is blocked. Allow both for this site, then knock again.';
   if (e?.name === 'NotFoundError') return 'No camera or microphone was found on this device.';
+  if (e?.name === 'NotReadableError' || /allocate|could not start|in use/i.test(e?.message || '')) return 'The camera is busy. Close other apps or tabs that use it.';
   return e?.message || 'Something went wrong.';
 }
 
@@ -155,8 +156,17 @@ async function joinCall({ knocking }) {
     });
     wireRoom(room);
     await room.connect(url, token);
-    await room.localParticipant.setMicrophoneEnabled(true);
-    await room.localParticipant.setCameraEnabled(true);
+    // One broken device must not end the call: carry on without it and say why.
+    const tryOn = async (fn, what, btn, on, off) => {
+      try { await fn(); return true; } catch (e) {
+        $('#call-status').textContent = `${what}: ${friendly(e)}`;
+        setPressed(btn, true, on, off);
+        return false;
+      }
+    };
+    const micOk = await tryOn(() => room.localParticipant.setMicrophoneEnabled(true), 'Microphone', '#mic', 'Unmute microphone', 'Mute microphone');
+    const camOk = await tryOn(() => room.localParticipant.setCameraEnabled(true), 'Camera', '#cam', 'Turn camera on', 'Turn camera off');
+    if (!micOk && !camOk) throw new Error('Neither the camera nor the microphone could start.');
     room.localParticipant.getTrackPublication(Track.Source.Camera)?.videoTrack?.attach($('#local'));
     const cams = await Room.getLocalDevices('videoinput').catch(() => []);
     $('#flip').hidden = cams.length < 2;
