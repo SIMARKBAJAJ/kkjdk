@@ -1,0 +1,24 @@
+{
+  "name": "anywhere-door",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A private two-person video door: knock, answer, full-screen call.",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "door": "node scripts/door.js",
+    "vapid": "web-push generate-vapid-keys",
+    "vendor": "node scripts/vendor.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "express": "^5.2.1",
+    "livekit-client": "^2.22.3",
+    "livekit-server-sdk": "^2.19.1",
+    "web-push": "^3.6.7"
+  }
+}
