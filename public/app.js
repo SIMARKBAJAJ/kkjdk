@@ -58,7 +58,7 @@ async function refresh() {
   try {
     s = await api('/status');
   } catch (e) {
-    if (e.status === 401 && !inCall) showJoin('Open the invite link you were sent to get in.');
+    if (e.status === 401 && !inCall) enterFlow();
     else if (stage.dataset.state === 'loading') setState('loading', 'The Door', 'Trying to reach the door…');
     return;
   }
@@ -283,17 +283,18 @@ async function setupPush() {
 
 // ---------- start ----------
 // A reusable door link: ask for a name once, then this device stays signed in.
-async function enterWithKey(key) {
+async function enterFlow() {
+  clearInterval(poll);
   const form = $('#enter'), input = $('#name');
   let seats;
-  try { seats = await api('/enter', { key }); } catch (e) { history.replaceState(null, '', '/'); return showJoin(e.message); }
+  try { seats = await api('/enter', {}); } catch (e) { return showJoin(e.message); }
   setState('join', 'The Door', seats.full ? 'Tap your name.' : 'Who are you? Type your name.');
   $('#names').replaceChildren(...seats.names.map((n) => Object.assign(document.createElement('button'), { type: 'button', className: 'soft', textContent: n, onclick: () => submit(n) })));
   input.hidden = seats.full;
   form.querySelector('button[type=submit]').hidden = seats.full;
   form.hidden = false;
   async function submit(name) {
-    try { await api('/enter', { key, name }); } catch (e) { return flash(e.message); }
+    try { await api('/enter', { name }); } catch (e) { return flash(e.message); }
     history.replaceState(null, '', '/');
     form.hidden = true;
     start();
@@ -303,8 +304,7 @@ async function enterWithKey(key) {
 
 async function init() {
   const params = new URLSearchParams(location.search);
-  const doorKey = params.get('door');
-  if (doorKey) return enterWithKey(doorKey);
+  if (params.has('door')) history.replaceState(null, '', '/'); // old door links still work, the key is no longer needed
   const code = params.get('invite');
   if (code) {
     try { await api('/join', { code }); } catch (e) { history.replaceState(null, '', '/'); return showJoin(e.message); }

@@ -157,15 +157,8 @@ async function auth(req, res, next) {
   next();
 }
 
-// One reusable door link (?door=KEY) for a private pair: whoever has it picks a name on first visit.
-// KEY is DOOR_KEY if set, otherwise derived from LIVEKIT_API_SECRET so no extra setting is needed.
-const doorKey = () => process.env.DOOR_KEY || (process.env.LIVEKIT_API_SECRET
-  ? crypto.createHmac('sha256', process.env.LIVEKIT_API_SECRET).update('door-link').digest('hex').slice(0, 32) : '');
+// Anyone who opens the site picks one of the two names; that device then stays signed in.
 app.post('/api/enter', rate('enter', 10, 60_000, (req) => req.ip), async (req, res) => {
-  const key = String(req.body?.key || ''), want = doorKey();
-  if (!want || key.length !== want.length || !crypto.timingSafeEqual(Buffer.from(key), Buffer.from(want))) {
-    return res.status(400).json({ error: 'This link is not valid.' });
-  }
   let [door] = await all('SELECT id FROM doors ORDER BY created LIMIT 1');
   if (!door) { door = { id: rand(16) }; await run('INSERT INTO doors(id, created) VALUES (?, ?)', door.id, now()); }
   const users = await all('SELECT id, name FROM users WHERE door_id = ? ORDER BY created', door.id);
