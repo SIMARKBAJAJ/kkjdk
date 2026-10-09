@@ -3,6 +3,10 @@ import { createClient } from '@libsql/client';
 import crypto from 'node:crypto';
 
 // Hosted (Turso) when deployed, a plain local file when developing or testing.
+// Vercel's disk is read-only, so a missing URL there would crash with an unreadable error.
+if (process.env.VERCEL && !process.env.TURSO_DATABASE_URL) {
+  throw new Error('TURSO_DATABASE_URL is not set. Add it (and TURSO_AUTH_TOKEN) under Vercel > Settings > Environment Variables, then redeploy.');
+}
 export const db = createClient({
   url: process.env.TURSO_DATABASE_URL || 'file:door.db',
   authToken: process.env.TURSO_AUTH_TOKEN || undefined,

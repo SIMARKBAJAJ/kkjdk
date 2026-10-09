@@ -20,8 +20,13 @@ const KNOCK_MS = 60_000;          // how long a knock rings before it counts as 
 const ONLINE_MS = 15_000;         // a device counts as online if it polled this recently
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const RECONNECT_MS = 15 * 60 * 1000;
-const pushOn = Boolean(VAPID_PUBLIC && VAPID_PRIVATE);
-if (pushOn) webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+let pushOn = Boolean(VAPID_PUBLIC && VAPID_PRIVATE);
+if (pushOn) {
+  try { webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE); } catch (e) {
+    console.error('Push disabled: bad VAPID settings:', e.message); // keep the door working without push
+    pushOn = false;
+  }
+}
 
 // ---------- helpers ----------
 // Serverless rule: nothing may be left running after a response (no timers, no fire-and-forget),
